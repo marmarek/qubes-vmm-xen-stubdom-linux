@@ -7,7 +7,7 @@ ROOTFS_IMG=build/rootfs/stubdom-linux-rootfs
 
 # Stubdom disk content
 STUBDOM_DISK_FILE= \
-  build/qemu/i386-softmmu/qemu-system-i386 \
+  build/qemu/x86_64-softmmu/qemu-system-x86_64 \
   rootfs/init \
   rootfs/qemu-ifup \
   rootfs/qemu-ifdown \
@@ -42,7 +42,7 @@ build/qemu/.gui-agent-copied-in: build/qemu/.extracted $(QEMU_GUI_AGENT_FILES)
 
 build/qemu/config.status: build/qemu/.patched
 	cd build/qemu && ./configure \
-		--target-list=i386-softmmu \
+		--target-list=x86_64-softmmu \
 		--enable-xen \
 		--enable-xen-pci-passthrough \
 		--disable-werror \
@@ -105,7 +105,7 @@ build/qemu/config.status: build/qemu/.patched
 		--cxx=/non-existent \
 		--prefix=
 
-build/qemu/i386-softmmu/qemu-system-i386: build/qemu/.patched build/qemu/config.status build/qemu/.gui-agent-copied-in
+build/qemu/x86_64-softmmu/qemu-system-x86_64: build/qemu/.patched build/qemu/config.status build/qemu/.gui-agent-copied-in
 	$(MAKE) -C build/qemu
 
 LINUX_PATCHES := $(shell $Q -l linux)

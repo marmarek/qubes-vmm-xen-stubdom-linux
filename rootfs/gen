@@ -50,7 +50,7 @@ do
   ln -s busybox "$rootfs_dir/bin/$i"
 done
 make DESTDIR="$PWD/build/qemu/install" -C build/qemu install
-inst build/qemu/install/bin/qemu-system-i386 /bin/qemu
+inst build/qemu/install/bin/qemu-system-x86_64 /bin/qemu
 for i in vgabios-{cirrus,stdvga}.bin efi-rtl8139.rom linuxboot.bin; do
   inst build/qemu/install/share/qemu/$i /share/qemu/$i
 done
