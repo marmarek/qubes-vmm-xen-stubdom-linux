@@ -50,7 +50,6 @@ for i in \
     timeout \
     touch \
     tr \
-    udhcpd \
     setsid \
     stty \
     cttyhack
@@ -58,19 +57,6 @@ do
     ln -s busybox "$rootfs_dir/bin/$i"
 done
 
-
-if [[ -e "$PWD/build/qrexec/agent/qrexec-agent" ]]; then
-    if [ -n "$LD_LIBRARY_PATH" ]; then
-	export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$PWD/build/padist/lib:$PWD/build/padist/lib/pulseaudio:$PWD/build/qrexec/libqrexec"
-    else
-	export LD_LIBRARY_PATH="$PWD/build/padist/lib:$PWD/build/padist/lib/pulseaudio:$PWD/build/qrexec/libqrexec"
-    fi
-    inst build/padist/usr/local/bin/pulseaudio /bin/pulseaudio
-    inst build/padist/usr/local/bin/pactl /bin/pactl
-    for mod in build/padist/lib/module-*.so; do
-	inst "$mod" "/lib/$(basename "$mod")"
-    done
-fi
 
 make DESTDIR="$PWD/build/qemu/install" -C build/qemu/build install
 inst build/qemu/install/usr/bin/qemu-system-i386 /bin/qemu
@@ -82,15 +68,6 @@ inst xenstore-read /bin/xenstore-read
 
 inst helpers/vchan-socket-proxy /bin/vchan-socket-proxy
 inst helpers/add-fd /bin/add-fd
-
-if [[ -e "$PWD/build/qrexec/agent/qrexec-agent" ]]; then
-inst helpers/qusb.sh /bin/qusb.sh
-inst build/qrexec/agent/qrexec-agent /bin/qrexec-agent
-inst build/qrexec/agent/qrexec-client-vm /bin/qrexec-client-vm
-inst build/qrexec/agent/qrexec-fork-server /bin/qrexec-fork-server
-echo "root:x:0:0:root:/root:/bin/sh" > "$rootfs_dir"/etc/passwd
-echo "bus/usb/00[1-9]/00[2-9] 0:0 660 *sh /bin/qusb.sh" > "$rootfs_dir"/etc/mdev.conf
-fi
 
 for i in write watch rm ls list; do
     ln -s xenstore-read "$rootfs_dir/bin/xenstore-$i"
@@ -129,16 +106,6 @@ rm -rf "${rootfs_dir:?}"/home
 touch "$rootfs_dir"/etc/ld.so.conf
 /sbin/ldconfig -r "$rootfs_dir" /lib
 ln -s lib "$rootfs_dir"/lib64
-
-if [[ -e "$PWD/build/libusb/.installed" ]]; then
-ln -s tmp "$rootfs_dir"/var
-mkdir -p "$rootfs_dir"/etc/qubes-rpc
-mkdir -p "$rootfs_dir"/usr/lib/qubes
-inst usbproxy/src/usb-import /usr/lib/qubes/usb-import
-inst qrexec/lib/qubes-rpc-multiplexer /usr/lib/qubes/qubes-rpc-multiplexer
-inst usbproxy/qubes-rpc/qubes.USBAttach /etc/qubes-rpc/qubes.USBAttach
-chmod a+x "$rootfs_dir"/etc/qubes-rpc/qubes.USBAttach
-fi
 
 find "$rootfs_dir" -print0 | xargs -0 touch -ch -d @0
 (

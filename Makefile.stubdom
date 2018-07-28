@@ -1,6 +1,6 @@
 include Makefile.vars
 
-.PHONY: all full install clean
+.PHONY: all install clean
 
 SHELL := bash
 
@@ -21,36 +21,18 @@ STUBDOM_DISK_FILE= \
 Q=scripts/quilt-wrapper
 
 all: $(VMLINUZ) $(ROOTFS_IMG)
-full: all
 
-ifneq ($(filter full,$(MAKECMDGOALS)),)
-    PKG_CONFIG_LIBDIR=$(shell pwd)/build/pulseaudio:$(shell pwd)/build/libusb
-    export PKG_CONFIG_LIBDIR
-    QEMU_OPTIONS=--enable-libusb --enable-pa --audio-drv-list=pa
-    QEMU_EXTRA_CFLAGS+=-I$(shell pwd)/build/padist/usr/local/include \
-	     -I$(shell pwd)/build/padist/usr/local/include/libusb-1.0
-    QEMU_EXTRA_LDFLAGS+=-Wl,-z,nodlopen -Wl,-z,nodump -Wl,-z,noexecstack \
-		 -Wl,-rpath-link,$(shell pwd)/build/padist/lib/pulseaudio \
-		 -L$(shell pwd)/build/padist/lib
-    ROOTFS_NAME=qemu-stubdom-linux-full-rootfs
-    KERNEL_NAME=qemu-stubdom-linux-full-kernel
-    KERNEL_CONFIG=[0-9][0-9]-*
-    FULL_BUILDDEPS=build/padist/usr/local/bin/pulseaudio \
-		build/libusb/.installed \
-		build/qrexec/agent/qrexec-agent
-else
-    QEMU_OPTIONS=--disable-libusb --audio-drv-list=
-    QEMU_EXTRA_CFLAGS=
-    QEMU_EXTRA_LDFLAGS=
-    FULL_BUILDDEPS=
-    ROOTFS_NAME=qemu-stubdom-linux-rootfs
-    KERNEL_NAME=qemu-stubdom-linux-kernel
-    KERNEL_CONFIG=[0-4][0-9]-*
-endif
+QEMU_OPTIONS=--disable-libusb --audio-drv-list=
+QEMU_EXTRA_CFLAGS=
+QEMU_EXTRA_LDFLAGS=
+FULL_BUILDDEPS=
+ROOTFS_NAME=qemu-stubdom-linux-rootfs
+KERNEL_NAME=qemu-stubdom-linux-kernel
+KERNEL_CONFIG=[0-4][0-9]-*
 
 BUSYBOX_PATCHES := $(shell $Q -l busybox)
 
-build/busybox/.extracted: busybox-$(BUSYBOX_VERSION).tar.bz2
+build/busybox/.extracted: dl/busybox-$(BUSYBOX_VERSION).tar.bz2
 	rm -rf build/busybox
 	mkdir -p build/busybox
 	tar -C build/busybox --strip-components=1 -xf $<
@@ -73,115 +55,9 @@ build/busybox/busybox: build/busybox/config.status
 	strip --strip-unneeded build/busybox/busybox_unstripped
 	mv build/busybox/busybox_unstripped build/busybox/busybox
 
-PULSEAUDIO_PATCHES := $(shell $Q -l pulseaudio)
-
-build/pulseaudio/.extracted: pulseaudio-$(PULSEAUDIO_VERSION).tar.xz
-	rm -rf build/pulseaudio
-	mkdir -p build/pulseaudio
-	tar -C build/pulseaudio --strip-components=1 -xf $<
-	touch $@
-
-build/pulseaudio/src/modules/module-vchan-sink.c: build/pulseaudio/.extracted
-	cp pulseaudio/gui-agent/pulse/*vchan-sink* build/pulseaudio/src/modules/
-
-build/pulseaudio/.patched: build/pulseaudio/.extracted pulseaudio/patches/series $(PULSEAUDIO_PATCHES)
-	[ ! -d build/pulseaudio/.patches ] || $Q -C build/pulseaudio -. pop -a
-	rm -rf build/pulseaudio/.patches
-	cp -aL pulseaudio/patches build/pulseaudio/.patches
-	$Q -C build/pulseaudio -. push -a
-	touch $@
-
-build/pulseaudio/config.status: build/pulseaudio/.patched  build/pulseaudio/src/modules/module-vchan-sink.c
-	cd build/pulseaudio && aclocal && ./configure \
-		--disable-silent-rules \
-		--disable-static \
-		--disable-static-bins \
-		--disable-rpath \
-		--disable-oss-output \
-		--disable-coreaudio-output \
-		--disable-jack \
-		--disable-nls \
-		--disable-lirc \
-		--disable-tcpwrap \
-		--disable-bluez5 \
-		--disable-gconf \
-		--disable-gsettings \
-		--disable-neon-opt \
-		--disable-webrtc-aec \
-		--disable-systemd-daemon \
-		--disable-dbus \
-		--disable-gtk3 \
-		--disable-alsa \
-		--disable-esound \
-		--disable-largefile \
-		--disable-x11 \
-		--disable-oss-wrapper \
-		--without-caps \
-		--with-database=simple \
-		--without-fftw \
-		--without-speex \
-		--without-soxr \
-		--disable-manpages \
-		--disable-per-user-esound-socket \
-		--disable-gstreamer \
-		--disable-systemd-journal \
-		--disable-systemd-login \
-		--disable-systemd-daemon \
-		--disable-openssl \
-		--disable-udev \
-		--disable-ipv6 \
-		--disable-hal-compat \
-		--disable-tcpwrap \
-		--disable-asyncns \
-		--disable-waveout \
-		--enable-memfd \
-		--disable-tests \
-		--disable-glib2 \
-		--with-module-dir=/lib \
-		--libdir=/lib \
-		ac_cv_header_locale_h=no \
-		ac_cv_func_strtod_l=no \
-		ac_cv_header_langinfo_h=no \
-		ac_cv_func_shm_open=no \
-		ac_cv_func_fork=no \
-		ac_cv_func_getaddrinfo=no \
-		ac_cv_func_getuid=no \
-		ac_cv_func_seteuid=no \
-		ac_cv_func_setresuid=no \
-		ac_cv_func_setreuid=no \
-		ac_cv_header_pwd_h=no \
-		ac_cv_header_grp_h=no
-
-build/padist/usr/local/bin/pulseaudio: build/pulseaudio/config.status
-	$(MAKE) $(MAKE_PARALLEL) install-strip -C build/pulseaudio DESTDIR=$(shell pwd)/build/padist
-
-build/libusb/.extracted: libusb-$(LIBUSB_VERSION).tar.bz2
-	rm -rf build/libusb
-	mkdir -p build/libusb
-	tar -C build/libusb --strip-components=1 -xf $<
-	touch $@
-
-build/libusb/config.status: build/libusb/.extracted
-	cd build/libusb && ./configure \
-			--disable-static \
-			--disable-udev \
-			--libdir=/lib
-
-build/libusb/.installed: build/libusb/config.status
-	$(MAKE) $(MAKE_PARALLEL) -C build/libusb
-	$(MAKE)	install-strip -C build/libusb DESTDIR=$(shell pwd)/build/padist
-	touch $@
-
-build/qrexec/agent/qrexec-agent:
-	rm -rf build/qrexec
-	mkdir -p build
-	cp -a qrexec build/
-	make BACKEND_VMM=xen -C build/qrexec/libqrexec all
-	make BACKEND_VMM=xen -C build/qrexec/agent qrexec-client-vm qrexec-agent qrexec-fork-server
-
 QEMU_PATCHES := $(shell $Q -l qemu)
 
-build/qemu/.extracted: qemu-$(QEMU_VERSION).tar.xz
+build/qemu/.extracted: dl/qemu-$(QEMU_VERSION).tar.xz
 	rm -rf build/qemu
 	mkdir -p build/qemu
 	tar -C build/qemu --strip-components=1 -xf $<
@@ -195,18 +71,7 @@ build/qemu/.patched: build/qemu/.extracted qemu/patches/series $(QEMU_PATCHES)
 	$Q -C build/qemu -. push -a
 	touch $@
 
-QEMU_GUI_AGENT_FILES := $(shell find qemu/gui-agent -type f \! \( -name '*.sw?' -o -name '*~' -o -name '.*' -o -name '*.patch' \) | sort)
-
-build/qemu/.gui-agent-copied-in: build/qemu/.extracted $(QEMU_GUI_AGENT_FILES)
-	rm -rf build/qemu/ui/gui-agent
-	cp -a qemu/gui-agent build/qemu/ui/
-	# generates qubes-keycode2scancode.c
-	make -C build/qemu/ui/gui-agent/gui-agent-qemu/
-	touch $@
-
-export QEMU_PKG_CONFIG_FLAGS=--with-path=$(shell pwd)/build/padist/lib/pkgconfig
-
-build/qemu/build/config.status: build/qemu/.patched build/qemu/.gui-agent-copied-in $(FULL_BUILDDEPS)
+build/qemu/build/config.status: build/qemu/.patched
 	mkdir -p build/qemu/build && cd build/qemu/build && ../configure \
 		--without-default-features \
 		--target-list=i386-softmmu \
@@ -287,9 +152,12 @@ build/qemu/build/qemu-system-i386: build/qemu/.patched build/qemu/build/config.s
 	$(MAKE) $(MAKE_PARALLEL) -C build/qemu/build
 	strip --strip-unneeded $@
 
+$(SEABIOS): build/qemu/.patched
+	$(MAKE) -C build/qemu/roms build-seabios-config-seabios-256k
+
 LINUX_PATCHES := $(shell $Q -l linux)
 
-build/linux/.extracted: linux-$(LINUX_VERSION).tar
+build/linux/.extracted: dl/linux-$(LINUX_VERSION).tar
 	rm -rf build/linux
 	mkdir -p build/linux
 	tar -C build/linux --strip-components=1 -xf $<

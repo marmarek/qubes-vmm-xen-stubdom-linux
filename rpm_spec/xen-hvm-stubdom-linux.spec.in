@@ -13,7 +13,7 @@ Group: System
 License: GPL
 URL: https://www.qubes-os.org/
 
-Requires: xen-libs >= 2001:4.14.3-5
+Requires: xen-libs
 
 Provides: xen-hvm = %{version}-%{release}
 Provides: xen-hvm-stubdom-gvt
@@ -40,25 +40,11 @@ BuildRequires: hostname
 BuildRequires: libfdt-devel
 BuildRequires: dtc
 
-# pulseaudio
-BuildRequires: gettext-devel
-BuildRequires: libtool-ltdl-devel
-BuildRequires: libsndfile-devel
-BuildRequires: m4
-
-# QEMU Qubes gui-agent
-BuildRequires: qubes-gui-common-devel
-BuildRequires: qubes-libvchan-xen-devel
-
 # Linux
 BuildRequires: bc
 BuildRequires: bison
 BuildRequires: elfutils-libelf-devel
 BuildRequires: flex
-# gcc with support for BTI mitigation
-%if 0%{?fedora} == 25
-BuildRequires: gcc >= 6.4.1-1.qubes1
-%endif
 BuildRequires: gcc-plugin-devel
 BuildRequires: gcc-c++
 
@@ -68,23 +54,14 @@ BuildRequires: libsepol-devel
 BuildRequires: perl-Pod-Html
 
 # rootfs
-BuildRequires: xen-runtime >= 2001:4.8.2-10
+BuildRequires: xen-runtime
 BuildRequires: dracut
 BuildRequires: inotify-tools
-
-%if 0%{?fedora} == 25
-BuildRequires: gcc-c++ >= 6.4.1-1.qubes1
-%endif
-
-# qrexec
-BuildRequires: redhat-lsb-core
 
 Source0: %{name}-%{version}.tar.gz
 Source1: linux-%{LINUX_VERSION}.tar
 Source2: qemu-%{QEMU_VERSION}.tar.xz
 Source3: busybox-%{BUSYBOX_VERSION}.tar.bz2
-Source4: pulseaudio-%{PULSEAUDIO_VERSION}.tar.xz
-Source5: libusb-%{LIBUSB_VERSION}.tar.bz2
 
 %define debug_package %{nil}
 
@@ -92,31 +69,18 @@ Source5: libusb-%{LIBUSB_VERSION}.tar.bz2
 This package contains the files (i.e. kernel and rootfs) for a Linux based
 stubdom.
 
-%package full
-Summary: Linux stubdom files for Xen with additional services
-
-%description full
-This package contains the files (i.e. kernel and rootfs) for a Linux based
-stubdom. Full version includes qrexec-daemon, pulseaudio and libusb support.
-
 %prep
 %setup -q
-cp %{SOURCE1} %{SOURCE2} %{SOURCE3} %{SOURCE4} %{SOURCE5} .
+mkdir -p dl
+cp %{SOURCE1} %{SOURCE2} %{SOURCE3} dl/
 
 
 %build
 make -f Makefile.stubdom MAKE_PARALLEL="%{?_smp_mflags}" DESTDIR=${RPM_BUILD_ROOT} all install
-make -f Makefile.stubdom clean
-make -f Makefile.stubdom MAKE_PARALLEL="%{?_smp_mflags}" DESTDIR=${RPM_BUILD_ROOT} full install
 
 %files
 /usr/libexec/xen/boot/qemu-stubdom-linux-rootfs
 /usr/libexec/xen/boot/qemu-stubdom-linux-kernel
-
-%files full
-/usr/libexec/xen/boot/qemu-stubdom-linux-full-rootfs
-/usr/libexec/xen/boot/qemu-stubdom-linux-full-kernel
-
 
 %changelog
 @CHANGELOG@

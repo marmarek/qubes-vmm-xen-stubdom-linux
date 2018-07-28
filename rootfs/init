@@ -20,57 +20,6 @@ vm_path=$(xenstore-read "/local/domain/$domid/vm")
 # NUL well
 dm_args=$(xenstore-read $(xenstore-list -p "$vm_path/image/dm-argv"|sort))
 
-usb_args=
-if test -e /bin/qrexec-agent; then
-    usb_args=$'-device\nnec-usb-xhci,id=xhci'
-    mkdir -p /var/run/qubes
-    USER=root qrexec-agent &
-    touch /dev/mdev.log
-    mdev -d
-fi
-
-# Extract audiovm parameter and remove them from dm_args
-audio_args=$(echo "$dm_args" | sed -n '/^-qubes-audio:/p')
-dm_args=$(echo "$dm_args" | sed '/^-qubes-audio:/d')
-# We support core-admin not setting -qubes-audio option
-if [ -z "$audio_args" ]; then
-    domid=0
-else
-    domid="$(echo "$audio_args" | sed -n 's/^.*[:,]audiovm_xid=\([^,]\+\).*$/\1/p')"
-fi
-
-# add audiodev conf to cmdline and run pulseaudio
-audio_model=$(echo "$dm_args" | sed -n '/^\(intel-hda\|ac97\|adlib\|es1370\|cs4231a\|gus\|sb16\)$/ {p}')
-if [ -n "$audio_model" ] ; then
-    model_args=
-    if [ "$audio_model" == "intel-hda" ] ; then
-	model_args=$',timer-period=1000,out.buffer-length=8000,in.latency=80000'
-    fi
-    export XDG_CONFIG_HOME='/tmp'
-    pa_args=$'-audiodev\npa,id=qemupa,server=unix:/tmp/pa.sock'$model_args;
-    if [ "$domid" -ge 0 ]; then
-        pulseaudio --use-pid-file=no --daemonize=no --exit-idle-time=-1 -n \
-            -L "module-native-protocol-unix auth-anonymous=1 socket=/tmp/pa.sock" \
-            -L "module-vchan-sink domid=$domid" &
-    else
-        pulseaudio --use-pid-file=no --daemonize=no --exit-idle-time=-1 -n \
-            -L "module-native-protocol-unix auth-anonymous=1 socket=/tmp/pa.sock" \
-            -L "module-always-sink" \
-            -L "module-always-source" \
-            -L "module-null-sink" \
-            -L "module-null-source" &
-    fi
-    dm_args=$(echo "$dm_args" | sed 's/^\(hda-duplex\)$/\0,audiodev=qemupa/')
-fi
-
-# Extract network parameters and remove them from dm_args
-net_args=$(echo "$dm_args" | sed -n '/^-qubes-net:/p')
-dm_args=$(echo "$dm_args" | sed '/^-qubes-net:/d')
-
-get_net_arg() {
-    echo "$net_args" | sed -n 's/^.*[:,]'$1'=\([^,]\+\).*$/\1/p'
-}
-
 if test -e /sys/class/net/eth0; then
     ip link set eth0 address fe:ff:ff:ff:ff:fe
     ip addr flush eth0
@@ -78,24 +27,6 @@ if test -e /sys/class/net/eth0; then
     brctl addbr br0
     brctl addif br0 eth0
     ip link set br0 up
-    net_dns_0=$(get_net_arg "dns_0")
-    net_dns_1=$(get_net_arg "dns_1")
-    net_client_ip=$(get_net_arg "client_ip")
-    net_netmask=$(get_net_arg "netmask")
-    net_gw=$(get_net_arg "gw")
-    udhcpd -f -I $net_gw - <<EOC &
-start $net_client_ip
-end $net_client_ip
-max_leases 1
-
-interface br0
-
-lease_file /dev/null
-
-opt dns $net_dns_0 $net_dns_1
-opt subnet $net_netmask
-opt router $net_gw
-EOC
 else
     echo "No network interface named eth0."
     ls -l /sys/class/net/
@@ -105,18 +36,6 @@ target="$(xenstore-read target)"
 device_model="device-model/$target"
 
 mkdir /tmp/qmp
-
-kernel=
-if echo "$dm_args" | grep -q '^-append' && [ -b /dev/xvdd ]; then
-    mkdir /tmp/boot
-    mount /dev/xvdd /tmp/boot -o ro
-    if [ -f /tmp/boot/vmlinuz ]; then
-        kernel=$'-kernel\n/tmp/boot/vmlinuz'
-        if [ -f /tmp/boot/initramfs ]; then
-            kernel="$kernel"$'\n-initrd\n/tmp/boot/initramfs'
-        fi
-    fi
-fi
 
 mkfifo /tmp/qmp/qemu.in /tmp/qmp/qemu.out
 
@@ -189,7 +108,7 @@ set -f
 qemu -sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny \
 -chardev pipe,path=/tmp/qmp/qemu,id=m -mon chardev=m,mode=control \
 -chardev socket,server,nowait,path=/tmp/qemu.qmp,id=m2 -mon chardev=m2,mode=control \
-    $dm_args $pa_args $usb_args $kernel &
+    $dm_args &
 set +f
 unset IFS
 
