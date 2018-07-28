@@ -46,7 +46,6 @@ for i in \
     tee \
     touch \
     tr \
-    udhcpd \
     setsid \
     cttyhack
 do
