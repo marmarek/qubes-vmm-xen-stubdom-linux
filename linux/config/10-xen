@@ -9,6 +9,7 @@ CONFIG_XENFS=y
 ## xen console
 CONFIG_TTY=y
 CONFIG_HVC_XEN=y
+CONFIG_HVC_XEN_FRONTEND=y
 
 ## netfront
 CONFIG_NET=y
