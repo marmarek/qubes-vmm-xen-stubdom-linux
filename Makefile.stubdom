@@ -20,7 +20,7 @@ Q=scripts/quilt-wrapper
 
 all: $(VMLINUZ) $(ROOTFS_IMG)
 
-build/busybox/.extracted: busybox-$(BUSYBOX_VERSION).tar.bz2
+build/busybox/.extracted: dl/busybox-$(BUSYBOX_VERSION).tar.bz2
 	rm -rf build/busybox
 	mkdir -p build/busybox
 	tar -C build/busybox --strip-components=1 -xf $<
@@ -38,7 +38,7 @@ build/busybox/busybox: build/busybox/config.status
 
 QEMU_PATCHES := $(shell $Q -l qemu)
 
-build/qemu/.extracted: qemu-$(QEMU_VERSION).tar.xz
+build/qemu/.extracted: dl/qemu-$(QEMU_VERSION).tar.xz
 	rm -rf build/qemu
 	mkdir -p build/qemu
 	tar -C build/qemu --strip-components=1 -xf $<
@@ -50,13 +50,6 @@ build/qemu/.patched: build/qemu/.extracted qemu/patches/series $(QEMU_PATCHES)
 	rm -rf build/qemu/.patches
 	cp -aL qemu/patches build/qemu/.patches
 	$Q -C build/qemu -. push -a
-	touch $@
-
-QEMU_GUI_AGENT_FILES := $(shell find qemu/gui-agent -type f \! \( -name '*.sw?' -o -name '*~' -o -name '.*' -o -name '*.patch' \) | sort)
-
-build/qemu/.gui-agent-copied-in: build/qemu/.extracted $(QEMU_GUI_AGENT_FILES)
-	rm -rf build/qemu/gui-agent
-	cp -a qemu/gui-agent build/qemu/
 	touch $@
 
 build/qemu/config.status: build/qemu/.patched
@@ -136,7 +129,7 @@ build/qemu/config.status: build/qemu/.patched
 		--extra-ldflags="-Wl,-z,nodlopen -Wl,-z,nodump -Wl,-z,noexecstack" \
 		--prefix=
 
-build/qemu/i386-softmmu/qemu-system-i386: build/qemu/.patched build/qemu/config.status build/qemu/.gui-agent-copied-in
+build/qemu/i386-softmmu/qemu-system-i386: build/qemu/.patched build/qemu/config.status
 	$(MAKE) -C build/qemu/roms seavgabios-{cirrus,stdvga}
 	$(MAKE) -C build/qemu/pc-bios/optionrom linuxboot.bin
 	$(MAKE) -C build/qemu
@@ -146,7 +139,7 @@ $(SEABIOS): build/qemu/.patched
 
 LINUX_PATCHES := $(shell $Q -l linux)
 
-build/linux/.extracted: linux-$(LINUX_VERSION).tar.xz
+build/linux/.extracted: dl/linux-$(LINUX_VERSION).tar.xz
 	rm -rf build/linux
 	mkdir -p build/linux
 	tar -C build/linux --strip-components=1 -xf $<
@@ -162,19 +155,7 @@ build/linux/.patched: build/linux/.extracted linux/patches/series $(LINUX_PATCHE
 build/linux/.config: $(sort $(wildcard linux/config/[0-9][0-9]-*)) build/linux/.extracted
 	cd build/linux; env -u MAKEFLAGS ./scripts/kconfig/merge_config.sh -n /dev/null ../../linux/config/[0-9][0-9]-*
 
-U2MFN_DIR = $(shell ls -d /usr/src/u2mfn-* 2>/dev/null | sort -V | tail -n 1)
-
-ifeq ($(U2MFN_DIR),)
-$(error "u2mfn dir not found in /usr/src/")
-endif
-
-build/linux/.u2mfn-copied-in: build/linux/.extracted $(U2MFN_DIR)
-	rm -rf build/linux/drivers/u2mfn
-	cp -a $(U2MFN_DIR) build/linux/drivers/u2mfn
-	sed -i -e 's/^obj-m/obj-y/' build/linux/drivers/u2mfn/Makefile
-	touch $@
-
-$(VMLINUZ): build/linux/.patched build/linux/.config build/linux/.u2mfn-copied-in
+$(VMLINUZ): build/linux/.patched build/linux/.config
 	$(MAKE) -C build/linux
 
 DRACUT_INSTALL=/usr/lib/dracut/dracut-install

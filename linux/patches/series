@@ -1,5 +1,3 @@
-u2mfn-built-in.patch
-
 pci_op-cleanup.patch
 xsa155-linux-0008-xen-Add-RING_COPY_RESPONSE.patch
 xsa155-linux44-0009-xen-netfront-copy-response-out-of-shared-buffer-befo.patch

@@ -47,18 +47,6 @@ mkdir /tmp/qmp
 mkdir /tmp/qmp/req
 mkdir /tmp/qmp/res
 
-kernel=
-if [ -b /dev/xvdd ]; then
-    mkdir /tmp/boot
-    mount /dev/xvdd /tmp/boot -o ro
-    if [ -f /tmp/boot/vmlinuz ]; then
-        kernel=$'-kernel\x1b/tmp/boot/vmlinuz'
-        if [ -f /tmp/boot/initramfs ]; then
-            kernel="$kernel"$'\x1b-initrd\x1b/tmp/boot/initramfs'
-        fi
-    fi
-fi
-
 mkfifo /tmp/qmp/qemu.in /tmp/qmp/qemu.out /tmp/qmp/qemu_res.out
 
 (
@@ -97,12 +85,12 @@ while read -r line; do
 done < /proc/kmsg
 ) &
 
-# $dm_args and $kernel are separated with \x1b to allow for spaces in arguments.
+# $dm_args is separated with \x1b to allow for spaces in arguments.
 IFS=$'\x1b'
 set -f
 qemu -sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny \
 -chardev pipe,path=/tmp/qmp/qemu,id=m -mon chardev=m,mode=control \
-    $dm_args $kernel &
+    $dm_args &
 set +f
 unset IFS
 

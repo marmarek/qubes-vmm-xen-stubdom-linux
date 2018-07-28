@@ -27,19 +27,10 @@ BuildRequires: libtool
 BuildRequires: libseccomp-devel
 BuildRequires: pixman-devel
 
-# QEMU Qubes gui-agent
-BuildRequires: qubes-gui-common-devel
-BuildRequires: qubes-kernel-vm-support >= 4.0.4
-BuildRequires: qubes-libvchan-xen-devel
-
 # Linux
 BuildRequires: bc
 BuildRequires: bison
 BuildRequires: flex
-# gcc with support for BTI mitigation
-%if 0%{?fedora} == 25
-BuildRequires: gcc >= 6.4.1-1.qubes1
-%endif
 BuildRequires: gcc-plugin-devel
 
 # Busybox
@@ -50,10 +41,6 @@ BuildRequires: libsepol-devel
 BuildRequires: xen-runtime >= 2001:4.8.2-10
 BuildRequires: dracut
 BuildRequires: inotify-tools
-
-%if 0%{?fedora} == 25
-BuildRequires: gcc-c++ >= 6.4.1-1.qubes1
-%endif
 
 Source0: %{name}-%{version}.tar.gz
 Source1: linux-%{LINUX_VERSION}.tar.xz
@@ -69,7 +56,8 @@ stubdom.
 
 %prep
 %setup -q
-cp %{SOURCE1} %{SOURCE2} %{SOURCE3} .
+mkdir -p dl
+cp %{SOURCE1} %{SOURCE2} %{SOURCE3} dl/
 
 
 %build
