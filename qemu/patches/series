@@ -11,3 +11,4 @@ pci-fix-emu-mask.patch
 bda08a5-seccomp-prefer-SCMP_ACT_KILL_PROCESS-if-available.patch
 70dfabe-seccomp-set-the-seccomp-filter-to-all-threads.patch
 additional-seccomp-filters.patch
+suppress_vmdesc.patch

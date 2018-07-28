@@ -68,6 +68,14 @@ while read -r line; do
 done < /proc/kmsg
 ) &
 
+# setup FD 3 and 4 for migration stream (incoming, outgoing), actual qemu
+# options are controlled by the toolstack
+if exec 3</dev/hvc2; then
+    stty raw -echo -echoctl <&3
+fi
+if exec 4>/dev/hvc1; then
+    stty raw -echo -echoctl <&4
+fi
 # $dm_args is separated with \x1b to allow for spaces in arguments.
 IFS=$'\x1b'
 set -f
@@ -78,6 +86,9 @@ set +f
 unset IFS
 
 qemu_pid=$!
+
+exec 3<&-
+exec 4>&-
 
 (
 set +x
