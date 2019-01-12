@@ -14,7 +14,8 @@ STUBDOM_DISK_FILE= \
   build/qemu/i386-softmmu/qemu-system-i386 \
   rootfs/init \
   rootfs/qemu-ifup \
-  rootfs/qemu-ifdown
+  rootfs/qemu-ifdown \
+  helpers/vchan-socket-proxy
 
 Q=scripts/quilt-wrapper
 
@@ -157,6 +158,9 @@ build/linux/.config: $(sort $(wildcard linux/config/[0-9][0-9]-*)) build/linux/.
 
 $(VMLINUZ): build/linux/.patched build/linux/.config
 	$(MAKE) -C build/linux
+
+helpers/vchan-socket-proxy: helpers/vchan-socket-proxy.c
+	$(MAKE) -C helpers
 
 DRACUT_INSTALL=/usr/lib/dracut/dracut-install
 

@@ -52,7 +52,6 @@ for i in \
 do
     ln -s busybox "$rootfs_dir/bin/$i"
 done
-inst inotifywait /bin/inotifywait
 
 make DESTDIR="$PWD/build/qemu/install" -C build/qemu install
 inst build/qemu/install/bin/qemu-system-i386 /bin/qemu
@@ -61,6 +60,8 @@ inst build/qemu/pc-bios/vgabios-cirrus.bin /share/qemu/vgabios-cirrus.bin
 inst build/qemu/pc-bios/vgabios-stdvga.bin /share/qemu/vgabios-stdvga.bin
 
 inst /usr/bin/xenstore-read /bin/xenstore-read
+
+inst helpers/vchan-socket-proxy /bin/vchan-socket-proxy
 
 for i in write watch rm; do
     ln -s xenstore-read "$rootfs_dir/bin/xenstore-$i"

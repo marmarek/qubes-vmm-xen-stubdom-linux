@@ -9,6 +9,7 @@ CONFIG_PACKET=y
 CONFIG_BRIDGE=y
 # unfortunately we need INET for udhcpd and tun/tap support
 CONFIG_INET=y
+CONFIG_UNIX=y
 
 ## network
 CONFIG_NET_CORE=y
