@@ -24,7 +24,9 @@ fi
 
 domid=$(/bin/xenstore-read "target")
 vm_path=$(xenstore-read "/local/domain/$domid/vm")
-dm_args=$(xenstore-read -R "$vm_path/image/dmargs")
+# convert multiple keys into \n separated arguments, as shell doesn't handle
+# NUL well
+dm_args=$(xenstore-read $(xenstore-list -p "$vm_path/image/dmargs"|sort))
 
 target="$(xenstore-read target)"
 device_model="device-model/$target"
@@ -81,8 +83,8 @@ fi
 if exec 4>/dev/hvc1; then
     stty raw -echo -echoctl <&4
 fi
-# $dm_args is separated with \x1b to allow for spaces in arguments.
-IFS=$'\x1b'
+# $dm_args is separated with \n to allow for spaces in arguments.
+IFS=$'\n'
 set -f
 qemu -sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny \
 -chardev pipe,path=/tmp/qmp/qemu,id=m -mon chardev=m,mode=control \

@@ -43,6 +43,7 @@ for i in \
     seq \
     sh \
     sleep \
+    sort \
     tee \
     touch \
     tr \
@@ -63,7 +64,7 @@ inst /usr/bin/xenstore-read /bin/xenstore-read
 
 inst helpers/vchan-socket-proxy /bin/vchan-socket-proxy
 
-for i in write watch rm; do
+for i in write watch rm ls list; do
     ln -s xenstore-read "$rootfs_dir/bin/xenstore-$i"
 done
 
