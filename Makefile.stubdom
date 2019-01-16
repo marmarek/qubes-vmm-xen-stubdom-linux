@@ -4,6 +4,7 @@ include Makefile.vars
 
 SHELL := bash
 
+STUBDOM_BINDIR=/usr/lib/xen/boot
 VMLINUZ=build/linux/arch/x86/boot/bzImage
 ROOTFS_IMG=build/rootfs/stubdom-linux-rootfs
 SEABIOS=build/qemu/roms/seabios/builds/seabios-256k/bios.bin
@@ -171,9 +172,9 @@ $(ROOTFS_IMG): rootfs/gen $(STUBDOM_DISK_FILE)
 	env -u MAKELEVEL -u MAKEFLAGS -u MFLAGS ./$<
 
 install: $(VMLINUZ) $(ROOTFS_IMG) $(SEABIOS)
-	install -D -m 444 $(VMLINUZ) $(DESTDIR)/usr/lib/xen/boot/stubdom-linux-kernel
-	install -m 444 $(ROOTFS_IMG) $(DESTDIR)/usr/lib/xen/boot/
-	install -m 444 $(SEABIOS) $(DESTDIR)/usr/lib/xen/boot/seabios-256k.bin
+	install -D -m 444 $(VMLINUZ) $(DESTDIR)$(STUBDOM_BINDIR)/stubdom-linux-kernel
+	install -m 444 $(ROOTFS_IMG) $(DESTDIR)$(STUBDOM_BINDIR)/
+	install -m 444 $(SEABIOS) $(DESTDIR)$(STUBDOM_BINDIR)/seabios-256k.bin
 
 clean:
 	rm -rf build
