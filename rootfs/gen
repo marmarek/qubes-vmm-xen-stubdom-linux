@@ -60,7 +60,7 @@ inst build/qemu/pc-bios/optionrom/linuxboot.bin /share/qemu/linuxboot.bin
 inst build/qemu/pc-bios/vgabios-cirrus.bin /share/qemu/vgabios-cirrus.bin
 inst build/qemu/pc-bios/vgabios-stdvga.bin /share/qemu/vgabios-stdvga.bin
 
-inst /usr/bin/xenstore-read /bin/xenstore-read
+inst xenstore-read /bin/xenstore-read
 
 inst helpers/vchan-socket-proxy /bin/vchan-socket-proxy
 
@@ -81,8 +81,14 @@ inst "rootfs/qemu-ifdown" "/etc/qemu-ifdown"
 inst "rootfs/init" "/init"
 
 mkdir $rootfs_dir/lib.new
-(find $rootfs_dir/{,usr/}lib{,64} -type f -print0 || true) | xargs -0 mv -t $rootfs_dir/lib.new/
-rm -rf $rootfs_dir/{,usr/}lib{,64}
+(find $rootfs_dir/{,usr/,usr/local/}lib{,64} -type f -print0 || true) | xargs -0 mv -t $rootfs_dir/lib.new/
+rm -rf $rootfs_dir/{,usr/,usr/local/}lib{,64}
+IFS=:
+for d in $LD_LIBRARY_PATH; do
+(find $rootfs_dir/$d -type f -print0 || true) | xargs -0 mv -t $rootfs_dir/lib.new/
+rm -rf $rootfs_dir/$d
+done
+unset IFS
 mv $rootfs_dir/lib{.new,}
 touch $rootfs_dir/etc/ld.so.conf
 /sbin/ldconfig -r $rootfs_dir
