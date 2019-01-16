@@ -1,57 +1,125 @@
---- a/hw/xen/xen_pt.c
-+++ b/hw/xen/xen_pt.c
-@@ -790,6 +790,10 @@ static void xen_pt_realize(PCIDevice *d,
-         return;
-     }
+Index: qemu/hw/xen/xen-host-pci-device.c
+===================================================================
+--- qemu.orig/hw/xen/xen-host-pci-device.c
++++ qemu/hw/xen/xen-host-pci-device.c
+@@ -10,6 +10,7 @@
+ #include "qapi/error.h"
+ #include "qemu-common.h"
+ #include "qemu/cutils.h"
++#include "hw/xen/xen_backend.h"
+ #include "xen-host-pci-device.h"
  
-+    if (!xen_stubdom_enable()) {
-+        s->machine_addr = s->hostaddr;
+ #define XEN_HOST_PCI_MAX_EXT_CAP \
+@@ -34,13 +35,76 @@
+ #define IORESOURCE_PREFETCH     0x00001000      /* No side effects */
+ #define IORESOURCE_MEM_64       0x00100000
+ 
++static void xen_host_pci_fill_local_addr(XenHostPCIDevice *d, Error **errp)
++{
++    unsigned int num_devs, len, i;
++    unsigned int domain, bus, dev, func;
++    char *be_path = NULL;
++    char path[80];
++    char *msg = NULL;
++
++    be_path = xs_read(xenstore, 0, "device/pci/0/backend", &len);
++    if (!be_path)
++        goto err_out;
++    snprintf(path, sizeof(path), "%s/num_devs", be_path);
++    msg = xs_read(xenstore, 0, path, &len);
++    if (!msg)
++        goto err_out;
++
++    if (sscanf(msg, "%u", &num_devs) != 1) {
++        error_setg(errp, "Failed to parse %s (%s)\n", msg, path);
++        goto err_out;
++    }
++    free(msg);
++
++    for (i = 0; i < num_devs; i++) {
++        snprintf(path, sizeof(path), "%s/dev-%u", be_path, i);
++        msg = xs_read(xenstore, 0, path, &len);
++        if (!msg) {
++            error_setg(errp, "Failed to read %s\n", path);
++            goto err_out;
++        }
++        if (sscanf(msg, "%x:%x:%x.%x", &domain, &bus, &dev, &func) != 4) {
++            error_setg(errp, "Failed to parse %s (%s)\n", msg, path);
++            goto err_out;
++        }
++        free(msg);
++        if (domain != d->domain ||
++                bus != d->bus ||
++                dev != d->dev ||
++                func!= d->func)
++            continue;
++        snprintf(path, sizeof(path), "%s/vdev-%u", be_path, i);
++        msg = xs_read(xenstore, 0, path, &len);
++        if (!msg) {
++            error_setg(errp, "Failed to read %s\n", path);
++            goto out;
++        }
++        if (sscanf(msg, "%x:%x:%x.%x", &domain, &bus, &dev, &func) != 4) {
++            error_setg(errp, "Failed to parse %s (%s)\n", msg, path);
++            goto err_out;
++        }
++        free(msg);
++        d->local_domain = domain;
++        d->local_bus = bus;
++        d->local_dev = dev;
++        d->local_func = func;
++        goto out;
 +    }
 +
-     s->is_virtfn = s->real_device.is_virtfn;
-     if (s->is_virtfn) {
-         XEN_PT_LOG(d, "%04x:%02x:%02x.%d is a SR-IOV Virtual Function\n",
-@@ -804,8 +808,8 @@ static void xen_pt_realize(PCIDevice *d,
-     s->io_listener = xen_pt_io_listener;
++err_out:
++    free(msg);
++out:
++    free(be_path);
++}
++
+ static void xen_host_pci_sysfs_path(const XenHostPCIDevice *d,
+                                     const char *name, char *buf, ssize_t size)
+ {
+     int rc;
  
-     /* Setup VGA bios for passthrough GFX */
--    if ((s->real_device.domain == 0) && (s->real_device.bus == 0) &&
--        (s->real_device.dev == 2) && (s->real_device.func == 0)) {
-+    if ((s->machine_addr.domain == 0) && (s->machine_addr.bus == 0) &&
-+        (s->machine_addr.slot == 2) && (s->machine_addr.function == 0)) {
-         if (!is_igd_vga_passthrough(&s->real_device)) {
-             error_setg(errp, "Need to enable igd-passthru if you're trying"
-                     " to passthrough IGD GFX");
-@@ -936,6 +940,7 @@ static void xen_pt_unregister_device(PCI
+     rc = snprintf(buf, size, "/sys/bus/pci/devices/%04x:%02x:%02x.%d/%s",
+-                  d->domain, d->bus, d->dev, d->func, name);
++                  d->local_domain, d->local_bus, d->local_dev, d->local_func, name);
+     assert(rc >= 0 && rc < size);
+ }
  
- static Property xen_pci_passthrough_properties[] = {
-     DEFINE_PROP_PCI_HOST_DEVADDR("hostaddr", XenPCIPassthroughState, hostaddr),
-+    DEFINE_PROP_PCI_HOST_DEVADDR("machine_addr", XenPCIPassthroughState, machine_addr),
-     DEFINE_PROP_BOOL("permissive", XenPCIPassthroughState, permissive, false),
-     DEFINE_PROP_END_OF_LIST(),
- };
---- a/hw/xen/xen_pt.h
-+++ b/hw/xen/xen_pt.h
-@@ -210,6 +210,7 @@ struct XenPCIPassthroughState {
-     PCIDevice dev;
+@@ -343,6 +407,17 @@ void xen_host_pci_device_get(XenHostPCID
+     d->dev = dev;
+     d->func = func;
  
-     PCIHostDeviceAddress hostaddr;
-+    PCIHostDeviceAddress machine_addr;
-     bool is_virtfn;
-     bool permissive;
-     bool permissive_warned;
---- a/hw/xen/xen_pt_msi.c
-+++ b/hw/xen/xen_pt_msi.c
-@@ -135,9 +135,9 @@ static int msi_msix_setup(XenPCIPassthro
-         }
++    if (xen_stubdom_enable()) {
++        xen_host_pci_fill_local_addr(d, &err);
++        if (err)
++            goto error;
++    } else {
++        d->local_domain = d->domain;
++        d->local_bus = d->bus;
++        d->local_dev = d->dev;
++        d->local_func = d->func;
++    }
++
+     xen_host_pci_config_open(d, &err);
+     if (err) {
+         goto error;
+Index: qemu/hw/xen/xen-host-pci-device.h
+===================================================================
+--- qemu.orig/hw/xen/xen-host-pci-device.h
++++ qemu/hw/xen/xen-host-pci-device.h
+@@ -23,6 +23,12 @@ typedef struct XenHostPCIDevice {
+     uint8_t dev;
+     uint8_t func;
  
-         rc = xc_physdev_map_pirq_msi(xen_xc, xen_domid, XEN_PT_AUTO_ASSIGN,
--                                     ppirq, PCI_DEVFN(s->real_device.dev,
--                                                      s->real_device.func),
--                                     s->real_device.bus,
-+                                     ppirq, PCI_DEVFN(s->machine_addr.slot,
-+                                                      s->machine_addr.function),
-+                                     s->machine_addr.bus,
-                                      msix_entry, table_base);
-         if (rc) {
-             XEN_PT_ERR(&s->dev,
++    /* different from the above in case of stubdomain */
++    uint16_t local_domain;
++    uint8_t local_bus;
++    uint8_t local_dev;
++    uint8_t local_func;
++
+     uint16_t vendor_id;
+     uint16_t device_id;
+     uint32_t class_code;
