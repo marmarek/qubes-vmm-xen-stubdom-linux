@@ -19,7 +19,7 @@ Building
    - automake
    - edk2-tools
    - libtool
-   - libseccomp-devel
+   - libseccomp-devel >= 2.3.0
    - pixman-devel
    - xen-devel
 
