@@ -1,5 +1,6 @@
 /dl/
 /build/
 helpers/vchan-socket-proxy
+helpers/add-fd
 *.swp
 /pkgs/

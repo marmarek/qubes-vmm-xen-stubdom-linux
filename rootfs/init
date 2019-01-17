@@ -95,10 +95,15 @@ unset IFS
 
 qemu_pid=$!
 
+qmp_hello=$'{"execute":"qmp_capabilities","id":1}\r\n'
+qmp_addfd=$'{"execute":"add-fd", "arguments": { "fdset-id": 1 }, "id":42 }\r\n'
+
+while [ ! -e /tmp/qemu.qmp ]; do sleep 0.1; done
+add-fd /tmp/qemu.qmp /dev/fd/4 "$qmp_hello$qmp_addfd" "42"
+
 exec 3<&-
 exec 4>&-
 
-# TODO: add-fd save file
 
 # FIXME: this assume dom0 as toolstack domain
 vchan-socket-proxy 0 $device_model/qmp-vchan /tmp/qemu.qmp &

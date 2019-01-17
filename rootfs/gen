@@ -63,6 +63,7 @@ inst build/qemu/pc-bios/vgabios-stdvga.bin /share/qemu/vgabios-stdvga.bin
 inst xenstore-read /bin/xenstore-read
 
 inst helpers/vchan-socket-proxy /bin/vchan-socket-proxy
+inst helpers/add-fd /bin/add-fd
 
 for i in write watch rm ls list; do
     ln -s xenstore-read "$rootfs_dir/bin/xenstore-$i"
