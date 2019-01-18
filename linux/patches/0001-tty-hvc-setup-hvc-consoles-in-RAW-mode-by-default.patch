@@ -1,0 +1,39 @@
+From d4d11f56294468ed98a756ecce47eb83a908bceb Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Marczykowski-G=C3=B3recki?=
+ <marmarek@invisiblethingslab.com>
+Date: Fri, 18 Jan 2019 19:11:27 +0100
+Subject: [PATCH] tty/hvc: setup hvc consoles in RAW mode by default
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Organization: Invisible Things Lab
+Cc: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
+
+In Xen stubdomain consoles are used to transfer data, not interactive
+terminal. It is important to not mangle this data, including not
+throwing away excess data read at device open(). The last part is the
+reason why issuing `stty raw` isn't enough - it's too late.
+
+Signed-off-by: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
+---
+ drivers/tty/hvc/hvc_console.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/tty/hvc/hvc_console.c b/drivers/tty/hvc/hvc_console.c
+index 27284a2dcd2b..cd063b3c6903 100644
+--- a/drivers/tty/hvc/hvc_console.c
++++ b/drivers/tty/hvc/hvc_console.c
+@@ -1035,6 +1035,10 @@ static int hvc_init(void)
+ 	drv->minor_start = HVC_MINOR;
+ 	drv->type = TTY_DRIVER_TYPE_SYSTEM;
+ 	drv->init_termios = tty_std_termios;
++	/* by default start in RAW mode, so opening device wouldn't throw away
++	 * buffered data */
++	drv->init_termios.c_iflag = 0;
++	drv->init_termios.c_lflag &= ~(ISIG | ICANON);
+ 	drv->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
+ 	tty_set_operations(drv, &hvc_ops);
+ 
+-- 
+2.17.2
+
