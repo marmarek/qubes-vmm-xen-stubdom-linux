@@ -1,4 +1,5 @@
 pci_op-cleanup.patch
+0001-tty-hvc-setup-hvc-consoles-in-RAW-mode-by-default.patch
 xsa155-linux-0008-xen-Add-RING_COPY_RESPONSE.patch
 xsa155-linux44-0009-xen-netfront-copy-response-out-of-shared-buffer-befo.patch
 xsa155-linux44-0010-xen-netfront-do-not-use-data-already-exposed-to-back.patch
