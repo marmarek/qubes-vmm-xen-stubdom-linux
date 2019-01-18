@@ -1,11 +1,13 @@
 Skip waiting for VMDESC state section, it isn't sent when resuming Xen domain.
 
---- a/hw/i386/pc_piix.c	2018-07-27 19:29:15.497335397 +0200
-+++ a/hw/i386/pc_piix.c	2018-07-28 18:23:03.645789791 +0200
-@@ -416,6 +416,7 @@ static void pc_xen_hvm_init(MachineState
-     if (bus != NULL) {
-         pci_create_simple(bus, -1, "xen-platform");
-     }
+Index: qemu/hw/i386/pc_piix.c
+===================================================================
+--- qemu.orig/hw/i386/pc_piix.c
++++ qemu/hw/i386/pc_piix.c
+@@ -410,6 +410,7 @@ static void pc_xen_hvm_init(MachineState
+ 
+     pc_xen_hvm_init_pci(machine);
+     pci_create_simple(pcms->bus, -1, "xen-platform");
 +    machine->suppress_vmdesc = true;
  }
  #endif
