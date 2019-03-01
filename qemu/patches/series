@@ -2,7 +2,7 @@
 0002-xen-Move-xenstore-initialization-to-common-location.patch
 0003-xen-Skip-backend-initialization-for-stubdom.patch
 0004-xen-Set-HVM_PARAM_DM_DOMAIN-for-stubdom-on-older-Xen.patch
-disable-msix-caps.patch
+0007-xen-pt-Hide-MSI-X-from-xen-stubdoms.patch
 fw_cfg-init.patch
 round-pci-region-sizes.patch
 disable-nic-option-rom.patch
