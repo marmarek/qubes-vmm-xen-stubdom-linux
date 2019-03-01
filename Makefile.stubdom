@@ -111,7 +111,6 @@ build/qemu/config.status: build/qemu/.patched
 		--disable-vhost-scsi \
 		--disable-qom-cast-debug \
 		--disable-virglrenderer \
-		--enable-stubdom \
 		--disable-tools \
 		--disable-replication \
 		--disable-vhost-vsock \

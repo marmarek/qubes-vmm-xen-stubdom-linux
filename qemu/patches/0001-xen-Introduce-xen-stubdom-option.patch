@@ -1,0 +1,86 @@
+From a0dc3a6f88cf84d38c907982fd5cafe3fc7029e7 Mon Sep 17 00:00:00 2001
+From: Jason Andryuk <jandryuk@gmail.com>
+Date: Wed, 6 Feb 2019 11:24:49 -0500
+Subject: [PATCH 1/6] xen: Introduce -xen-stubdom option
+
+With Xen, QEMU can run isolated in a dedicated service VM - a stubdom.
+There are a few differences when running in a stubdom compared to dom0.
+Add the -xen-stubdom option to select this mode at runtime.  The default
+is off.
+
+Signed-off-by: Jason Andryuk <jandryuk@gmail.com>
+---
+ include/hw/xen/xen.h | 1 +
+ qemu-options.hx      | 5 +++++
+ vl.c                 | 8 ++++++++
+ 3 files changed, 14 insertions(+)
+
+diff --git a/include/hw/xen/xen.h b/include/hw/xen/xen.h
+index ba039c146d..86ecf4aa4b 100644
+--- a/include/hw/xen/xen.h
++++ b/include/hw/xen/xen.h
+@@ -21,6 +21,7 @@ enum xen_mode {
+ extern uint32_t xen_domid;
+ extern enum xen_mode xen_mode;
+ extern bool xen_domid_restrict;
++extern bool xen_stubdom;
+ 
+ extern bool xen_allowed;
+ 
+@@ -29,6 +30,11 @@ static inline bool xen_enabled(void)
+     return xen_allowed;
+ }
+ 
++static inline bool xen_stubdom_enabled(void)
++{
++    return xen_stubdom;
++}
++
+ int xen_pci_slot_get_pirq(PCIDevice *pci_dev, int irq_num);
+ void xen_piix3_set_irq(void *opaque, int irq_num, int level);
+ void xen_piix_pci_write_config_client(uint32_t address, uint32_t val, int len);
+diff --git a/qemu-options.hx b/qemu-options.hx
+index 521511ec13..ecaebb9290 100644
+--- a/qemu-options.hx
++++ b/qemu-options.hx
+@@ -3403,6 +3403,11 @@ DEF("xen-domid-restrict", 0, QEMU_OPTION_xen_domid_restrict,
+     "                        to specified domain id. (Does not affect\n"
+     "                        xenpv machine type).\n",
+     QEMU_ARCH_ALL)
++DEF("xen-stubdom", 0, QEMU_OPTION_xen_stubdom,
++    "-xen-stubdom     specify QEMU is running in a stubdom, so certain\n"
++    "                 behavior changes. (Does not affect xenpv machine\n"
++    "                 type).\n",
++    QEMU_ARCH_ALL)
+ STEXI
+ @item -xen-domid @var{id}
+ @findex -xen-domid
+diff --git a/vl.c b/vl.c
+index bc9fbec654..516d047ea5 100644
+--- a/vl.c
++++ b/vl.c
+@@ -211,6 +211,7 @@ bool xen_allowed;
+ uint32_t xen_domid;
+ enum xen_mode xen_mode = XEN_EMULATE;
+ bool xen_domid_restrict;
++bool xen_stubdom;
+ 
+ static int has_defaults = 1;
+ static int default_serial = 1;
+@@ -3870,6 +3871,13 @@ int main(int argc, char **argv, char **envp)
+                 }
+                 xen_domid_restrict = true;
+                 break;
++            case QEMU_OPTION_xen_stubdom:
++                if (!(xen_available())) {
++                    error_report("Option not supported for this target");
++                    exit(1);
++                }
++                xen_stubdom = true;
++                break;
+             case QEMU_OPTION_trace:
+                 g_free(trace_file);
+                 trace_file = trace_opt_parse(optarg);
+-- 
+2.20.1
+
