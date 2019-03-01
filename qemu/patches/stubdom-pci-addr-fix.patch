@@ -92,7 +92,7 @@ Index: qemu/hw/xen/xen-host-pci-device.c
      d->dev = dev;
      d->func = func;
  
-+    if (xen_stubdom_enable()) {
++    if (xen_stubdom_enabled()) {
 +        xen_host_pci_fill_local_addr(d, &err);
 +        if (err)
 +            goto error;
