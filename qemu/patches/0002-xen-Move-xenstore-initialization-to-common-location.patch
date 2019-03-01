@@ -1,0 +1,52 @@
+From 750153389cfa2f408a40cc3adfabd3cb70bdb400 Mon Sep 17 00:00:00 2001
+From: Jason Andryuk <jandryuk@gmail.com>
+Date: Wed, 6 Feb 2019 11:30:34 -0500
+Subject: [PATCH 2/6] xen: Move xenstore initialization to common location
+
+For the xen stubdom case, we'll want xenstore initialized, but we'll
+want to skip the rest of xen_be_init.  Move the initialization to
+xen_hvm_init so we can conditionalize calling xen_be_init.
+
+xs_domain_open() is deprecated for xs_open(0), so make the replacement
+as well.
+
+Signed-off-by: Jason Andryuk <jandryuk@gmail.com>
+---
+ hw/i386/xen/xen-hvm.c       | 6 ++++++
+ hw/xen/xen-legacy-backend.c | 6 ------
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+--- a/hw/i386/xen/xen-hvm.c
++++ b/hw/i386/xen/xen-hvm.c
+@@ -1479,6 +1479,14 @@ void xen_hvm_init(PCMachineState *pcms,
+     QLIST_INIT(&state->dev_list);
+     device_listener_register(&state->device_listener);
+ 
++    xenstore = xs_open(0);
++    if (!xenstore) {
++        error_report("Can't connect to xenstored");
++        goto err;
++    }
++
++    qemu_set_fd_handler(xs_fileno(xenstore), xenstore_update, NULL, NULL);
++
+     /* Initialize backend core & drivers */
+     if (xen_be_init() != 0) {
+         error_report("xen backend core setup failed");
+--- a/hw/xen/xen_backend.c
++++ b/hw/xen/xen_backend.c
+@@ -674,14 +674,6 @@ int xen_be_init(void)
+ {
+     xengnttab_handle *gnttabdev;
+ 
+-    xenstore = xs_daemon_open();
+-    if (!xenstore) {
+-        xen_pv_printf(NULL, 0, "can't connect to xenstored\n");
+-        return -1;
+-    }
+-
+-    qemu_set_fd_handler(xs_fileno(xenstore), xenstore_update, NULL, NULL);
+-
+     if (xen_xc == NULL || xen_fmem == NULL) {
+         /* Check if xen_init() have been called */
+         goto err;

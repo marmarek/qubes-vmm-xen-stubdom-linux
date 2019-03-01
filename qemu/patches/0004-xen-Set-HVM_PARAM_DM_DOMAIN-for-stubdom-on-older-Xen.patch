@@ -1,0 +1,42 @@
+From bf7de853f779d664ac0663a9ab2ae4796490fb5f Mon Sep 17 00:00:00 2001
+From: Jason Andryuk <jandryuk@gmail.com>
+Date: Wed, 6 Feb 2019 12:26:08 -0500
+Subject: [PATCH 4/6] xen: Set HVM_PARAM_DM_DOMAIN for stubdom on older Xen
+
+When running in a stubdom, we have to inform the hypervisor that the
+stubdom and not dom0 is handling the device model.  Explicitly created
+ioreq servers are fine, but a call to HVM_PARAM_DM_DOMAIN is needed for
+the default ioreq server.
+
+Xen 4.12 removes the default ioreq server.  With that, Xen started
+returning an error when setting HVM_PARAM_DM_DOMAIN.  Put the
+HVM_PARAM_DM_DOMAIN call in the version compatibility header.  When we
+fallback to the default ioreq server, issue the call and don't bother to
+check the return value.
+
+Original patch by Anthony PERARD <anthony.perard@citrix.com>
+
+Signed-off-by: Jason Andryuk <jandryuk@gmail.com>
+---
+ include/hw/xen/xen_common.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/include/hw/xen/xen_common.h b/include/hw/xen/xen_common.h
+index 9a8155e172..d5c808772f 100644
+--- a/include/hw/xen/xen_common.h
++++ b/include/hw/xen/xen_common.h
+@@ -616,6 +616,11 @@ static inline void xen_create_ioreq_server(domid_t dom,
+ 
+     *ioservid = 0;
+     use_default_ioreq_server = true;
++
++    if (xen_stubdom_enabled()) {
++        xc_hvm_param_set(xen_xc, xen_domid, HVM_PARAM_DM_DOMAIN, DOMID_SELF);
++    }
++
+     trace_xen_default_ioreq_server();
+ }
+ 
+-- 
+2.20.1
+

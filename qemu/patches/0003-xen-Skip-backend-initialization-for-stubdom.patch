@@ -1,0 +1,39 @@
+From fe9f5306bf811238b35accc001c3b13bb30d08ea Mon Sep 17 00:00:00 2001
+From: Jason Andryuk <jandryuk@gmail.com>
+Date: Wed, 6 Feb 2019 11:36:15 -0500
+Subject: [PATCH 3/6] xen: Skip backend initialization for stubdom
+
+When QEMU is running in a stubdom, it does not provide any
+Paravirtualized backends.  Those still run in dom0 or another driver
+domain.  Therefore we skip backend initialization (xen_bus_init and
+xen_be_init) for the stubdom case.
+
+Original patch by Anthony PERARD <anthony.perard@citrix.com>
+
+Signed-off-by: Jason Andryuk <jandryuk@gmail.com>
+---
+ hw/i386/xen/xen-hvm.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+
+--- a/hw/i386/xen/xen-hvm.c
++++ b/hw/i386/xen/xen-hvm.c
+@@ -1485,12 +1485,14 @@ void xen_hvm_init(PCMachineState *pcms,
+         goto err;
+     }
+ 
+-    /* Initialize backend core & drivers */
+-    if (xen_be_init() != 0) {
+-        error_report("xen backend core setup failed");
+-        goto err;
++    if (!xen_stubdom_enabled()) {
++        /* Initialize backend core & drivers */
++        if (xen_be_init() != 0) {
++            error_report("xen backend core setup failed");
++            goto err;
++        }
++        xen_be_register_common();
+     }
+-    xen_be_register_common();
+ 
+     QLIST_INIT(&xen_physmap);
+     xen_read_physmap(state);
