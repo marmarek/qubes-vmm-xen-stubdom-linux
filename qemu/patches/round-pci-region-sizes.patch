@@ -1,21 +1,46 @@
+From b6ac300992f0c59878e179e1c8b93668514eb53c Mon Sep 17 00:00:00 2001
+From: HW42 <hw42@ipsumj.de>
+Date: Wed, 6 Feb 2019 13:02:34 -0500
+Subject: [PATCH 5/6] xen-pt: Round pci regions sizes to XEN_PAGE_SIZE
+
+If a pci memory region has a size < XEN_PAGE_SIZE it can get located at
+an address which is not page aligned. This breaks the memory mapping via
+xc_domain_memory_mapping since this function is page based and the
+"offset" is therefore lost.
+
+Without this patch you will see error like this in the stubdom log:
+
+  [00:05.0] xen_pt_bar_read: Error: Should not read BAR through QEMU. @0x0000000000000004
+
+QubesOS/qubes-issues#2849
+
+Signed-off-by: Jason Andryuk <jandryuk@gmail.com>
+---
+ hw/xen/xen_pt.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/hw/xen/xen_pt.c b/hw/xen/xen_pt.c
+index 5539d56c3a..7f680442ee 100644
 --- a/hw/xen/xen_pt.c
 +++ b/hw/xen/xen_pt.c
-@@ -450,8 +450,9 @@ static int xen_pt_register_regions(XenPC
+@@ -449,9 +449,10 @@ static int xen_pt_register_regions(XenPCIPassthroughState *s, uint16_t *cmd)
+     /* Register PIO/MMIO BARs */
      for (i = 0; i < PCI_ROM_SLOT; i++) {
          XenHostPCIIORegion *r = &d->io_regions[i];
-         uint8_t type;
 +        pcibus_t r_size = r->size;
+         uint8_t type;
  
 -        if (r->base_addr == 0 || r->size == 0) {
 +        if (r->base_addr == 0 || r_size == 0) {
              continue;
          }
  
-@@ -469,15 +470,17 @@ static int xen_pt_register_regions(XenPC
+@@ -469,15 +470,18 @@ static int xen_pt_register_regions(XenPCIPassthroughState *s, uint16_t *cmd)
                  type |= PCI_BASE_ADDRESS_MEM_TYPE_64;
              }
              *cmd |= PCI_COMMAND_MEMORY;
 +
++            /* Round up to a full page for the hypercall. */
 +            r_size = (r_size + XC_PAGE_SIZE - 1) & XC_PAGE_MASK;
          }
  
@@ -31,3 +56,6 @@
      }
  
      /* Register expansion ROM address */
+-- 
+2.20.1
+
