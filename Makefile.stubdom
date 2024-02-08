@@ -146,7 +146,7 @@ build/qemu/build/config.status: build/qemu/.patched
 		--prefix=/usr
 
 build/qemu/build/qemu-system-i386: build/qemu/.patched build/qemu/build/config.status
-	$(MAKE) $(MAKE_PARALLEL) -C build/qemu/roms seavgabios-{cirrus,stdvga}
+	$(MAKE) $(MAKE_PARALLEL) -C build/qemu/roms seavgabios-{cirrus,stdvga} 2>/dev/null
 	#$(MAKE) $(MAKE_PARALLEL) -C build/qemu/pc-bios/optionrom linuxboot.bin linuxboot_dma.bin
 	$(MAKE) $(MAKE_PARALLEL) -C build/qemu/build
 	strip --strip-unneeded $@
