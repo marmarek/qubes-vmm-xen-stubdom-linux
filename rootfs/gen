@@ -106,7 +106,8 @@ mv "$rootfs_dir"/lib{.new,}
 # possible leftovers from local $LD_LIBRARY_PATH + dracut-install
 rm -rf "${rootfs_dir:?}"/home
 touch "$rootfs_dir"/etc/ld.so.conf
-/sbin/ldconfig -r "$rootfs_dir" /lib
+# ldconfig in Alpine ignores -r
+(cd "$rootfs_dir"; /sbin/ldconfig -r "." ./lib)
 ln -s lib "$rootfs_dir"/lib64
 
 find "$rootfs_dir" -print0 | xargs -0 touch -ch -d @0
