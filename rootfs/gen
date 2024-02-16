@@ -63,6 +63,8 @@ inst build/qemu/install/usr/bin/qemu-system-i386 /bin/qemu
 inst build/qemu/build/pc-bios/optionrom/linuxboot_dma.bin /share/qemu/linuxboot_dma.bin
 cp build/qemu/pc-bios/vgabios-cirrus.bin "$rootfs_dir"/share/qemu/vgabios-cirrus.bin
 cp build/qemu/pc-bios/vgabios-stdvga.bin "$rootfs_dir"/share/qemu/vgabios-stdvga.bin
+cp build/qemu/pc-bios/efi-e1000.rom "$rootfs_dir"/share/qemu/efi-e1000.rom
+cp build/qemu/pc-bios/efi-rtl8139.rom "$rootfs_dir"/share/qemu/efi-rtl8139.rom
 
 inst xenstore-read /bin/xenstore-read
 

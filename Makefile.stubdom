@@ -61,7 +61,6 @@ build/qemu/.extracted: dl/qemu-$(QEMU_VERSION).tar.xz
 	rm -rf build/qemu
 	mkdir -p build/qemu
 	tar -C build/qemu --strip-components=1 -xf $<
-	rm build/qemu/pc-bios/*.{rom,bin,dtb} # remove prebuilt binaries
 	touch $@
 
 build/qemu/.patched: build/qemu/.extracted qemu/patches/series $(QEMU_PATCHES)

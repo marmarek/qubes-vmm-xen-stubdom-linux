@@ -4,7 +4,6 @@
 0006-Do-not-access-dev-mem-in-MSI-X-PCI-passthrough-on-Xe.patch
 0007-Conditionally-disable-MSI-X-cap.patch
 0008-xen-round-pci-region-sizes.patch
-0009-Disable-NIC-option-ROM.patch
 0011-Additional-seccomp-filters.patch
 0012-Register-ich6-ich9-soundhw.patch
 0013-pc_piix-suppress-vmdesc.patch
@@ -12,7 +11,6 @@
 0016-IGD-fix-undefined-behaviour.patch
 0017-IGD-improve-legacy-vbios-handling.patch
 0018-IGD-move-enabling-opregion-access-to-libxl.patch
-0019-pc-bios-ignore-prebuilt-binaries.patch
 0021-hw-xen-consider-PCI_CLASS_DISPLAY_OTHER-for-IGD-too.patch
 seabios-python3.patch
 seabios-svgamodes-Add-all-HD-and-QXGA-resolutions.patch
