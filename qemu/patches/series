@@ -1,5 +1,6 @@
 0001-hw-xen-detect-when-running-inside-stubdomain.patch
 0002-xen-fix-stubdom-PCI-addr.patch
+0004-Update-Xen-s-features.h-header.patch
 0005-hw-xen-xen_pt-Save-back-data-only-for-declared-regis.patch
 0006-Do-not-access-dev-mem-in-MSI-X-PCI-passthrough-on-Xe.patch
 0007-Conditionally-disable-MSI-X-cap.patch

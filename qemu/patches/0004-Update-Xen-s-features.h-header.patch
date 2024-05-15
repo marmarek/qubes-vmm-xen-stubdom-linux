@@ -1,0 +1,45 @@
+From e167b362448dc3abc677f3b925a58c55d6158da7 Mon Sep 17 00:00:00 2001
+Message-Id: <e167b362448dc3abc677f3b925a58c55d6158da7.1714955598.git-series.marmarek@invisiblethingslab.com>
+In-Reply-To: <cover.f5d45e3c2fb87552abfaf80982b0b724fca2134c.1714955598.git-series.marmarek@invisiblethingslab.com>
+References: <cover.f5d45e3c2fb87552abfaf80982b0b724fca2134c.1714955598.git-series.marmarek@invisiblethingslab.com>
+From: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
+Date: Wed, 27 Sep 2023 02:24:59 +0200
+Subject: [PATCH v3 2/3] Update Xen's features.h header
+
+Update it to get XENFEAT_dm_msix_all_writes for the next patch.
+
+Signed-off-by: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
+---
+ include/hw/xen/interface/features.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/include/hw/xen/interface/features.h b/include/hw/xen/interface/features.h
+index d2a9175..8801930 100644
+--- a/include/hw/xen/interface/features.h
++++ b/include/hw/xen/interface/features.h
+@@ -111,6 +111,23 @@
+ #define XENFEAT_not_direct_mapped         16
+ #define XENFEAT_direct_mapped             17
+ 
++/*
++ * Signal whether the domain is able to use the following hypercalls:
++ *
++ * VCPUOP_register_runstate_phys_area
++ * VCPUOP_register_vcpu_time_phys_area
++ */
++#define XENFEAT_runstate_phys_area        18
++#define XENFEAT_vcpu_time_phys_area       19
++
++/*
++ * If set, Xen will passthrough all MSI-X vector ctrl writes to device model,
++ * not only those unmasking an entry. This allows device model to properly keep
++ * track of the MSI-X table without having to read it from the device behind
++ * Xen's backs. This information is relevant only for device models.
++ */
++#define XENFEAT_dm_msix_all_writes        20
++
+ #define XENFEAT_NR_SUBMAPS 1
+ 
+ #endif /* __XEN_PUBLIC_FEATURES_H__ */
+-- 
+git-series 0.9.1

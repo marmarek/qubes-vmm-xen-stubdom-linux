@@ -1,42 +1,45 @@
-From d9bcff1339f75648f8f9d24a0912dc7faaeeb5b5 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Marek=20Marczykowski-G=C3=B3recki?=
- <marmarek@invisiblethingslab.com>
+From aa391652c33c8a4a64db8f27ad50ccb65600b293 Mon Sep 17 00:00:00 2001
+Message-Id: <aa391652c33c8a4a64db8f27ad50ccb65600b293.1714955598.git-series.marmarek@invisiblethingslab.com>
+In-Reply-To: <cover.f5d45e3c2fb87552abfaf80982b0b724fca2134c.1714955598.git-series.marmarek@invisiblethingslab.com>
+References: <cover.f5d45e3c2fb87552abfaf80982b0b724fca2134c.1714955598.git-series.marmarek@invisiblethingslab.com>
+From: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
 Date: Mon, 14 Nov 2022 13:40:02 +0100
-Subject: [PATCH 05/21] hw/xen/xen_pt: Save back data only for declared
- registers
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+Subject: [PATCH v3 1/3] hw/xen/xen_pt: Save back data only for declared registers
 
-Call pci_default_write_config() in xen_pt_pci_write_config() only for
-registers that have matching XenPTRegInfo structure, and do that only after
-resolving any custom handlers. This is important for two reasons:
+Call pci_default_write_config() only after resolving any handlers from
+XenPTRegInfo structures, and only with a value updated with those
+handlers. This is important for two reasons:
 1. XenPTRegInfo has ro_mask which needs to be enforced - Xen-specific
    hooks do that on their own (especially xen_pt_*_reg_write()).
-2. Not setting value early allows the hooks to see the old value too.
+2. Not setting value early allows hooks to see the old value too.
 
 If it would be only about the first point, setting PCIDevice.wmask would
-probably be sufficient, but given the second point, restructure those
+probably be sufficient, but given the second point, change those
 writes.
+
+Relevant handlers already save data back to the emulated registers
+space, call the pci_default_write_config() only for its side effects.
 
 Signed-off-by: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
 ---
- hw/xen/xen_pt.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+v3:
+ - use emulated register value for pci_default_write_config() call, not
+   the one for writting back to the hardware
+ - greatly simplify the patch by calling pci_default_write_config() on
+   the whole value
+v2:
+ - rewrite commit message, previous one was very misleading
+ - fix loop saving register values
+ - fix int overflow when calculating write mask
+---
+ hw/xen/xen_pt.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/hw/xen/xen_pt.c b/hw/xen/xen_pt.c
-index 36e6f93c3..1c08990bf 100644
+index 3635d1b..5f12d3c 100644
 --- a/hw/xen/xen_pt.c
 +++ b/hw/xen/xen_pt.c
-@@ -255,6 +255,7 @@ static void xen_pt_pci_write_config(PCIDevice *d, uint32_t addr,
-     uint32_t find_addr = addr;
-     XenPTRegInfo *reg = NULL;
-     bool wp_flag = false;
-+    uint32_t emul_mask = 0, write_val;
- 
-     if (xen_pt_pci_config_access_check(d, addr, len)) {
-         return;
-@@ -310,7 +311,6 @@ static void xen_pt_pci_write_config(PCIDevice *d, uint32_t addr,
+@@ -311,7 +311,6 @@ static void xen_pt_pci_write_config(PCIDevice *d, uint32_t addr,
      }
  
      memory_region_transaction_begin();
@@ -44,40 +47,18 @@ index 36e6f93c3..1c08990bf 100644
  
      /* adjust the read and write value to appropriate CFC-CFF window */
      read_val <<= (addr & 3) << 3;
-@@ -370,6 +370,8 @@ static void xen_pt_pci_write_config(PCIDevice *d, uint32_t addr,
-                 return;
-             }
- 
-+            emul_mask |= ( (1 << (reg->size * 8) ) - 1 ) << ((find_addr & 3) * 8);
-+
-             /* calculate next address to find */
-             emul_len -= reg->size;
-             if (emul_len > 0) {
-@@ -396,6 +398,24 @@ static void xen_pt_pci_write_config(PCIDevice *d, uint32_t addr,
+@@ -397,6 +396,12 @@ static void xen_pt_pci_write_config(PCIDevice *d, uint32_t addr,
      /* need to shift back before passing them to xen_host_pci_set_block. */
      val >>= (addr & 3) << 3;
  
-+    /* store emulated registers after calling their handlers */
-+    write_val = val;
-+    for (index = 0; index < len; index += emul_len) {
-+        emul_len = 0;
-+        while (emul_mask & 0xff) {
-+            emul_len++;
-+            emul_mask >>= 8;
-+        }
-+        if (emul_len) {
-+            uint32_t mask = ((1L << (emul_len * 8)) - 1);
-+            pci_default_write_config(d, addr + index, write_val & mask, emul_len);
-+        } else {
-+            emul_mask >>= 8;
-+            emul_len = 1;
-+        }
-+        write_val >>= emul_len * 8;
-+    }
++    /* Call default handler for its side effects only, with value already
++     * written by specific handlers. */
++    pci_default_write_config(d, addr,
++                             pci_default_read_config(d, addr, len),
++                             len);
 +
      memory_region_transaction_commit();
  
  out:
 -- 
-2.41.0
-
+git-series 0.9.1

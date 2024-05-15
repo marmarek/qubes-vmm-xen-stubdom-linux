@@ -1,11 +1,10 @@
-From 4f77420adc605fdb5841f27a7d3ffaba83e8a849 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Marek=20Marczykowski-G=C3=B3recki?=
- <marmarek@invisiblethingslab.com>
+From ebeb8c419feedad9fe0e9f39d3ed3a9ff0f4c49b Mon Sep 17 00:00:00 2001
+Message-Id: <ebeb8c419feedad9fe0e9f39d3ed3a9ff0f4c49b.1714955598.git-series.marmarek@invisiblethingslab.com>
+In-Reply-To: <cover.f5d45e3c2fb87552abfaf80982b0b724fca2134c.1714955598.git-series.marmarek@invisiblethingslab.com>
+References: <cover.f5d45e3c2fb87552abfaf80982b0b724fca2134c.1714955598.git-series.marmarek@invisiblethingslab.com>
+From: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
 Date: Thu, 22 Sep 2022 22:39:39 +0200
-Subject: [PATCH 06/21] Do not access /dev/mem in MSI-X PCI passthrough on Xen
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+Subject: [PATCH v3 3/3] Do not access /dev/mem in MSI-X PCI passthrough on Xen
 
 The /dev/mem is used for two purposes:
  - reading PCI_MSIX_ENTRY_CTRL_MASKBIT
@@ -14,40 +13,51 @@ The /dev/mem is used for two purposes:
 The first one was originally done because when Xen did not send all
 vector ctrl writes to the device model, so QEMU might have outdated old
 register value. If Xen is new enough, this has been changed, so QEMU can
-now use its cached value of the register instead.
+now use its cached value of the register instead. Detect the "new
+enough" based on XENFEAT_dm_msix_all_writes bit in XENVER_get_features.
 
 The Pending Bit Array (PBA) handling is for the case where it lives on
 the same page as the MSI-X table itself. Xen has been extended to handle
 this case too (as well as other registers that may live on those pages),
 so QEMU handling is not necessary anymore.
 
-Removing /dev/mem access is useful to work within stubdomain, and
-necessary when dom0 kernel runs in lockdown mode.
+Additionally, reading from /dev/mem is trapped and emulated by Xen, so
+QEMU doesn't see real values anyway. And if it did, this method is prone
+to race conditions. Removing /dev/mem access is useful to work within
+stubdomain (avoids emulated reads and potential races), and necessary
+when dom0 kernel runs in lockdown mode (where /dev/mem is unavailable at
+all).
 
 Signed-off-by: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
 ---
- hw/xen/xen_pt.h     |  9 +++++
- hw/xen/xen_pt_msi.c | 89 ++++++++++++++++++++++++++-------------------
- 2 files changed, 61 insertions(+), 37 deletions(-)
+Changes in v2:
+- Make change conditional on new Xen version (tested via
+  XENFEAT_dm_msix_all_writes)
+- add few comments
+---
+ hw/xen/xen_pt_msi.c | 94 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 59 insertions(+), 35 deletions(-)
 
 diff --git a/hw/xen/xen_pt_msi.c b/hw/xen/xen_pt_msi.c
-index 09cca4eecb..898db4a4d6 100644
+index 09cca4e..836cc9c 100644
 --- a/hw/xen/xen_pt_msi.c
 +++ b/hw/xen/xen_pt_msi.c
-@@ -460,15 +460,19 @@ static void pci_msix_write(void *opaque, hwaddr addr,
+@@ -460,15 +460,23 @@ static void pci_msix_write(void *opaque, hwaddr addr,
          entry->updated = true;
      } else if (msix->enabled && entry->updated &&
                 !(val & PCI_MSIX_ENTRY_CTRL_MASKBIT)) {
 -        const volatile uint32_t *vec_ctrl;
 -
--        /*
+         /*
 -         * If Xen intercepts the mask bit access, entry->vec_ctrl may not be
 -         * up-to-date. Read from hardware directly.
--         */
++         * Reading mask bit from hardware directly is needed on older Xen only.
+          */
 -        vec_ctrl = s->msix->phys_iomem_base + entry_nr * PCI_MSIX_ENTRY_SIZE
 -            + PCI_MSIX_ENTRY_VECTOR_CTRL;
 -        xen_pt_msix_update_one(s, entry_nr, *vec_ctrl);
 +        if (s->msix->phys_iomem_base) {
++            /* Memory mapped registers */
 +            const volatile uint32_t *vec_ctrl;
 +
 +            /*
@@ -63,20 +73,21 @@ index 09cca4eecb..898db4a4d6 100644
      }
  
      set_entry_value(entry, offset, val);
-@@ -493,7 +497,11 @@ static uint64_t pci_msix_read(void *opaque, hwaddr addr,
+@@ -493,7 +501,12 @@ static uint64_t pci_msix_read(void *opaque, hwaddr addr,
          return get_entry_value(&msix->msix_entry[entry_nr], offset);
      } else {
          /* Pending Bit Array (PBA) */
 -        return *(uint32_t *)(msix->phys_iomem_base + addr);
-+        if (s->msix->phys_iomem_base)
++        if (s->msix->phys_iomem_base) {
 +            return *(uint32_t *)(msix->phys_iomem_base + addr);
-+        XEN_PT_LOG(&s->dev, "reading PBA, addr %#lx, offset %#lx\n",
++        }
++        XEN_PT_LOG(&s->dev, "reading PBA, addr 0x%lx, offset 0x%lx\n",
 +                   addr, addr - msix->total_entries * PCI_MSIX_ENTRY_SIZE);
 +        return 0xFFFFFFFF;
      }
  }
  
-@@ -528,8 +536,8 @@ int xen_pt_msix_init(XenPCIPassthroughState *s, uint32_t base)
+@@ -528,8 +541,8 @@ int xen_pt_msix_init(XenPCIPassthroughState *s, uint32_t base)
      uint32_t table_off = 0;
      int i, total_entries, bar_index;
      XenHostPCIDevice *hd = &s->real_device;
@@ -86,17 +97,18 @@ index 09cca4eecb..898db4a4d6 100644
      XenPTMSIX *msix = NULL;
      int rc = 0;
  
-@@ -543,6 +551,9 @@ int xen_pt_msix_init(XenPCIPassthroughState *s, uint32_t base)
+@@ -543,6 +556,10 @@ int xen_pt_msix_init(XenPCIPassthroughState *s, uint32_t base)
          return -1;
      }
  
-+    if (xc_version(xen_xc, XENVER_get_features, &xc_version_info) < 0)
++    if (xc_version(xen_xc, XENVER_get_features, &xc_version_info) < 0) {
 +        return -1;
++    }
 +
      rc = xen_host_pci_get_word(hd, base + PCI_MSIX_FLAGS, &control);
      if (rc) {
          XEN_PT_ERR(d, "Failed to read PCI_MSIX_FLAGS field\n");
-@@ -576,33 +587,37 @@ int xen_pt_msix_init(XenPCIPassthroughState *s, uint32_t base)
+@@ -576,33 +593,40 @@ int xen_pt_msix_init(XenPCIPassthroughState *s, uint32_t base)
      msix->table_base = s->real_device.io_regions[bar_index].base_addr;
      XEN_PT_LOG(d, "get MSI-X table BAR base 0x%"PRIx64"\n", msix->table_base);
  
@@ -124,11 +136,10 @@ index 09cca4eecb..898db4a4d6 100644
 -    }
 -    msix->phys_iomem_base = (char *)msix->phys_iomem_base
 -        + msix->table_offset_adjust;
++    /* Accessing /dev/mem is needed only on older Xen. */
 +    if (!(xc_version_info.submap & (1U << XENFEAT_dm_msix_all_writes))) {
 +        int fd = -1;
- 
--    XEN_PT_LOG(d, "mapping physical MSI-X table to %p\n",
--               msix->phys_iomem_base);
++
 +        fd = open("/dev/mem", O_RDWR);
 +        if (fd == -1) {
 +            rc = -errno;
@@ -140,7 +151,8 @@ index 09cca4eecb..898db4a4d6 100644
 +        msix->table_offset_adjust = table_off & 0x0fff;
 +        msix->phys_iomem_base =
 +            mmap(NULL,
-+                 total_entries * PCI_MSIX_ENTRY_SIZE + msix->table_offset_adjust,
++                 total_entries * PCI_MSIX_ENTRY_SIZE
++                 + msix->table_offset_adjust,
 +                 PROT_READ,
 +                 MAP_SHARED | MAP_LOCKED,
 +                 fd,
@@ -148,12 +160,15 @@ index 09cca4eecb..898db4a4d6 100644
 +        close(fd);
 +        if (msix->phys_iomem_base == MAP_FAILED) {
 +            rc = -errno;
-+            XEN_PT_ERR(d, "Can't map physical MSI-X table: %s\n", strerror(errno));
++            XEN_PT_ERR(d, "Can't map physical MSI-X table: %s\n",
++                       strerror(errno));
 +            goto error_out;
 +        }
 +        msix->phys_iomem_base = (char *)msix->phys_iomem_base
 +            + msix->table_offset_adjust;
-+
+ 
+-    XEN_PT_LOG(d, "mapping physical MSI-X table to %p\n",
+-               msix->phys_iomem_base);
 +        XEN_PT_LOG(d, "mapping physical MSI-X table to %p\n",
 +                   msix->phys_iomem_base);
 +    }
@@ -161,5 +176,4 @@ index 09cca4eecb..898db4a4d6 100644
      memory_region_add_subregion_overlap(&s->bar[bar_index], table_off,
                                          &msix->mmio,
 -- 
-2.41.0
-
+git-series 0.9.1
