@@ -1,3 +1,4 @@
+0003-xen-mapcache-Keep-released-DMA-mappings-cached.patch
 0004-QubesGUI-display-options.patch
 0005-hw-xen-xen_pt-Save-back-data-only-for-declared-regis.patch
 0006-Do-not-access-dev-mem-in-MSI-X-PCI-passthrough-on-Xe.patch

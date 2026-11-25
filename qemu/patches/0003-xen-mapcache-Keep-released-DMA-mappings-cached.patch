@@ -1,0 +1,54 @@
+From 358c6fa0c92aa33367912f10a4eaeb7002a4784e Mon Sep 17 00:00:00 2001
+From: "Edgar E. Iglesias" <edgar.iglesias@amd.com>
+Date: Tue, 9 Jun 2026 07:47:07 -0700
+Subject: [PATCH] xen-mapcache: Keep released DMA mappings cached
+
+Releasing the last reference to a DMA mapping unmaps its cache
+bucket. Repeated accesses to the same guest memory therefore
+require fresh Xen foreign-memory mappings, adding substantial
+overhead to virtio.
+
+Keep valid foreign DMA buckets cached when their lock count reaches
+zero. Exclude dummy mappings so later requests retry foreign mapping.
+
+Signed-off-by: Edgar E. Iglesias <edgar.iglesias@amd.com>
+---
+ hw/xen/xen-mapcache.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/hw/xen/xen-mapcache.c b/hw/xen/xen-mapcache.c
+index 85cf0cf359..ca6065c832 100644
+--- a/hw/xen/xen-mapcache.c
++++ b/hw/xen/xen-mapcache.c
+@@ -558,6 +558,7 @@ static void xen_invalidate_map_cache_entry_unlocked(MapCache *mc,
+     MapCacheRev *reventry;
+     hwaddr paddr_index;
+     hwaddr size;
++    bool was_dma;
+     int found = 0;
+     int rc;
+ 
+@@ -579,6 +580,7 @@ static void xen_invalidate_map_cache_entry_unlocked(MapCache *mc,
+         }
+         return;
+     }
++    was_dma = reventry->dma;
+     QTAILQ_REMOVE(&mc->locked_entries, reventry, next);
+     g_free(reventry);
+ 
+@@ -601,6 +603,12 @@ static void xen_invalidate_map_cache_entry_unlocked(MapCache *mc,
+         return;
+     }
+ 
++    /* Keep valid foreign DMA mappings available for subsequent requests. */
++    if (was_dma && !(entry->flags & (XEN_MAPCACHE_ENTRY_GRANT |
++                                     XEN_MAPCACHE_ENTRY_DUMMY))) {
++        return;
++    }
++
+     ram_block_notify_remove(entry->vaddr_base, entry->size, entry->size);
+     if (entry->flags & XEN_MAPCACHE_ENTRY_GRANT) {
+         rc = xengnttab_unmap(xen_region_gnttabdev, entry->vaddr_base,
+-- 
+2.52.0
+
